@@ -26,13 +26,32 @@ VALUES
     (11, 8, '菜单管理', 'MENU', '/system/menus', 'system/menu', 'Menu', 'system:menu:list', 3, 1),
     (12, 8, '部门管理', 'MENU', '/system/depts', 'system/dept', 'OfficeBuilding', 'system:dept:list', 4, 1),
     (13, 0, '统计看板', 'MENU', '/reports', 'report/index', 'TrendCharts', 'report:view', 5, 1),
-    (14, 3, '转派工单', 'BUTTON', NULL, NULL, NULL, 'ticket:transfer', 10, 0);
+    (14, 3, '转派工单', 'BUTTON', NULL, NULL, NULL, 'ticket:transfer', 10, 1),
+    (15, 3, '创建工单', 'BUTTON', NULL, NULL, NULL, 'ticket:create', 11, 1),
+    (16, 3, '接单', 'BUTTON', NULL, NULL, NULL, 'ticket:accept', 12, 1),
+    (17, 3, '处理工单', 'BUTTON', NULL, NULL, NULL, 'ticket:process', 13, 1),
+    (18, 3, '确认关闭', 'BUTTON', NULL, NULL, NULL, 'ticket:confirm-close', 14, 1),
+    (19, 3, '驳回处理结果', 'BUTTON', NULL, NULL, NULL, 'ticket:reject', 15, 1),
+    (20, 3, '取消工单', 'BUTTON', NULL, NULL, NULL, 'ticket:cancel', 16, 1),
+    (21, 3, '评论工单', 'BUTTON', NULL, NULL, NULL, 'ticket:comment', 17, 1),
+    (22, 3, '上传工单附件', 'BUTTON', NULL, NULL, NULL, 'ticket:attachment:upload', 18, 1),
+    (23, 9, '维护用户', 'BUTTON', NULL, NULL, NULL, 'system:user:write', 10, 1),
+    (24, 10, '维护角色', 'BUTTON', NULL, NULL, NULL, 'system:role:write', 10, 1),
+    (25, 11, '维护菜单', 'BUTTON', NULL, NULL, NULL, 'system:menu:write', 10, 1),
+    (26, 12, '维护部门', 'BUTTON', NULL, NULL, NULL, 'system:dept:write', 10, 1),
+    (27, 4, '维护工单分类', 'BUTTON', NULL, NULL, NULL, 'ticket:category:write', 10, 1),
+    (28, 6, '维护派单规则', 'BUTTON', NULL, NULL, NULL, 'rule:dispatch:write', 10, 1),
+    (29, 7, '维护 SLA 规则', 'BUTTON', NULL, NULL, NULL, 'rule:sla:write', 10, 1);
+
+UPDATE sys_menu SET visible = 1 WHERE type = 'BUTTON' AND id BETWEEN 14 AND 29;
 
 INSERT IGNORE INTO sys_role_menu (id, role_id, menu_id)
 SELECT menu_id, 1, menu_id FROM (
     SELECT 1 AS menu_id UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL
     SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL
-    SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14
+    SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL
+    SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL
+    SELECT 24 UNION ALL SELECT 25 UNION ALL SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29
 ) t;
 
 INSERT IGNORE INTO sys_role_menu (id, role_id, menu_id)
@@ -40,10 +59,20 @@ VALUES
     (101, 4, 1),
     (102, 4, 2),
     (103, 4, 3),
+    (104, 4, 15),
+    (105, 4, 18),
+    (106, 4, 19),
+    (107, 4, 20),
+    (108, 4, 21),
+    (109, 4, 22),
     (201, 3, 1),
     (202, 3, 2),
     (203, 3, 3),
     (204, 3, 13),
+    (205, 3, 16),
+    (206, 3, 17),
+    (207, 3, 21),
+    (208, 3, 22),
     (301, 2, 1),
     (302, 2, 2),
     (303, 2, 3),
@@ -52,7 +81,14 @@ VALUES
     (306, 2, 6),
     (307, 2, 7),
     (308, 2, 13),
-    (309, 2, 14);
+    (309, 2, 14),
+    (310, 2, 16),
+    (311, 2, 17),
+    (312, 2, 18),
+    (313, 2, 19),
+    (314, 2, 20),
+    (315, 2, 21),
+    (316, 2, 22);
 
 INSERT IGNORE INTO sys_user (id, username, password_hash, password_salt, real_name, phone, email, dept_id, status)
 VALUES

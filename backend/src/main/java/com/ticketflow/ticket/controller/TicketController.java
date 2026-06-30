@@ -51,16 +51,19 @@ public class TicketController {
     }
 
     @PostMapping
+    @RequirePermission("ticket:create")
     public ApiResult<TicketDetailResponse> create(@Valid @RequestBody TicketCreateRequest request) {
         return ApiResult.success(ticketService.createTicket(request));
     }
 
     @PostMapping("/{id}/accept")
+    @RequirePermission("ticket:accept")
     public ApiResult<TicketDetailResponse> accept(@PathVariable Long id) {
         return ApiResult.success(ticketService.accept(id));
     }
 
     @PostMapping("/{id}/process")
+    @RequirePermission("ticket:process")
     public ApiResult<TicketDetailResponse> process(
             @PathVariable Long id,
             @Valid @RequestBody TicketHandleRequest request
@@ -78,6 +81,7 @@ public class TicketController {
     }
 
     @PostMapping("/{id}/confirm-close")
+    @RequirePermission("ticket:confirm-close")
     public ApiResult<TicketDetailResponse> confirmClose(
             @PathVariable Long id,
             @RequestBody(required = false) TicketActionRequest request
@@ -86,6 +90,7 @@ public class TicketController {
     }
 
     @PostMapping("/{id}/reject")
+    @RequirePermission("ticket:reject")
     public ApiResult<TicketDetailResponse> reject(
             @PathVariable Long id,
             @RequestBody(required = false) TicketActionRequest request
@@ -94,6 +99,7 @@ public class TicketController {
     }
 
     @PostMapping("/{id}/cancel")
+    @RequirePermission("ticket:cancel")
     public ApiResult<TicketDetailResponse> cancel(
             @PathVariable Long id,
             @RequestBody(required = false) TicketActionRequest request
@@ -102,6 +108,7 @@ public class TicketController {
     }
 
     @PostMapping("/{id}/comments")
+    @RequirePermission("ticket:comment")
     public ApiResult<TicketDetailResponse> comment(
             @PathVariable Long id,
             @Valid @RequestBody TicketCommentRequest request

@@ -49,6 +49,7 @@ public class AttachmentController {
     }
 
     @PostMapping("/upload")
+    @RequirePermission("ticket:attachment:upload")
     public ApiResult<AttachmentResponse> upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String businessType,
@@ -69,6 +70,7 @@ public class AttachmentController {
     }
 
     @PutMapping("/{id}/bind")
+    @RequirePermission("ticket:attachment:upload")
     public ApiResult<AttachmentResponse> bind(
             @PathVariable Long id,
             @Valid @RequestBody AttachmentBindRequest request
@@ -77,6 +79,7 @@ public class AttachmentController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermission("ticket:attachment:upload")
     public ApiResult<Void> delete(@PathVariable Long id) {
         attachmentService.deleteAttachment(id);
         return ApiResult.success();

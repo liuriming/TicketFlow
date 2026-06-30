@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ticketflow.common.cache.RedisJsonCacheService;
 import com.ticketflow.common.cache.TicketFlowCacheKeys;
+import com.ticketflow.common.exception.BusinessException;
+import com.ticketflow.common.exception.ErrorCode;
 import com.ticketflow.system.dto.SysRoleSaveRequest;
 import com.ticketflow.system.entity.SysRole;
 import com.ticketflow.system.entity.SysRoleMenu;
@@ -47,6 +49,19 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         return role;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SysRole updateEnabled(Long id, Integer enabled) {
+        SysRole role = getById(id);
+        if (role == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "角色不存在");
+        }
+        role.setEnabled(normalizeEnabled(enabled));
+        updateById(role);
+        cacheService.deleteByPattern(TicketFlowCacheKeys.permissionUserPattern());
+        return role;
+    }
+
     private void saveRoleMenus(Long roleId, List<Long> menuIds) {
         roleMenuMapper.delete(Wrappers.<SysRoleMenu>lambdaQuery().eq(SysRoleMenu::getRoleId, roleId));
         if (menuIds == null || menuIds.isEmpty()) {
@@ -67,5 +82,12 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                 .stream()
                 .map(SysRoleMenu::getMenuId)
                 .toList();
+    }
+
+    private Integer normalizeEnabled(Integer enabled) {
+        if (enabled == null || (enabled != 0 && enabled != 1)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "启用状态只能是 0 或 1");
+        }
+        return enabled;
     }
 }

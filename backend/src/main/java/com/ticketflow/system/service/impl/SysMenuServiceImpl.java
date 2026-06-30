@@ -3,6 +3,8 @@ package com.ticketflow.system.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ticketflow.common.cache.RedisJsonCacheService;
 import com.ticketflow.common.cache.TicketFlowCacheKeys;
+import com.ticketflow.common.exception.BusinessException;
+import com.ticketflow.common.exception.ErrorCode;
 import com.ticketflow.system.dto.SysMenuSaveRequest;
 import com.ticketflow.system.entity.SysMenu;
 import com.ticketflow.system.mapper.SysMenuMapper;
@@ -40,5 +42,24 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         saveOrUpdate(menu);
         cacheService.deleteByPattern(TicketFlowCacheKeys.permissionUserPattern());
         return menu;
+    }
+
+    @Override
+    public SysMenu updateEnabled(Long id, Integer enabled) {
+        SysMenu menu = getById(id);
+        if (menu == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "菜单不存在");
+        }
+        menu.setVisible(normalizeEnabled(enabled));
+        updateById(menu);
+        cacheService.deleteByPattern(TicketFlowCacheKeys.permissionUserPattern());
+        return menu;
+    }
+
+    private Integer normalizeEnabled(Integer enabled) {
+        if (enabled == null || (enabled != 0 && enabled != 1)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "启用状态只能是 0 或 1");
+        }
+        return enabled;
     }
 }

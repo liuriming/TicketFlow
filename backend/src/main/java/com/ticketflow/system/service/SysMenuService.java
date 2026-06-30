@@ -19,4 +19,13 @@ public interface SysMenuService extends IService<SysMenu> {
      * @return 保存后的菜单实体。
      */
     SysMenu saveMenu(Long id, SysMenuSaveRequest request);
+
+    /**
+     * 更新菜单或按钮权限启用状态。
+     *
+     * @param id 菜单 ID。
+     * @param enabled 启用状态：1 启用，0 停用。
+     * @return 更新后的菜单实体。
+     */
+    SysMenu updateEnabled(Long id, Integer enabled);
 }

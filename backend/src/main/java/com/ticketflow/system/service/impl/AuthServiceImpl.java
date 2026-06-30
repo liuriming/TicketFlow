@@ -203,7 +203,9 @@ public class AuthServiceImpl implements AuthService {
         if (menuIds.isEmpty()) {
             return List.of();
         }
-        return menuMapper.selectByIds(menuIds);
+        return menuMapper.selectByIds(menuIds).stream()
+                .filter(menu -> Objects.equals(menu.getVisible(), 1))
+                .toList();
     }
 
     private int dataScopeRank(DataScopeType dataScopeType) {

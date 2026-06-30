@@ -23,6 +23,15 @@ public interface SysRoleService extends IService<SysRole> {
     SysRole saveRole(Long id, SysRoleSaveRequest request);
 
     /**
+     * 更新角色启用状态。
+     *
+     * @param id 角色 ID。
+     * @param enabled 启用状态：1 启用，0 停用。
+     * @return 更新后的角色实体。
+     */
+    SysRole updateEnabled(Long id, Integer enabled);
+
+    /**
      * 查询角色授权的菜单 ID 集合。
      *
      * @param roleId 角色 ID。

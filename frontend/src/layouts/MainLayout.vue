@@ -201,7 +201,7 @@ async function handleMessageClick(message) {
     await loadUnreadCount()
   }
   if (message.businessType === 'TICKET' && message.businessId) {
-    router.push('/tickets/list')
+    router.push({ path: '/tickets/list', query: { ticketId: message.businessId } })
   }
 }
 </script>

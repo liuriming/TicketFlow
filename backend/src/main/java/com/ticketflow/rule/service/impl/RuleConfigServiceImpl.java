@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ticketflow.common.cache.RedisJsonCacheService;
 import com.ticketflow.common.cache.TicketFlowCacheKeys;
+import com.ticketflow.common.exception.BusinessException;
+import com.ticketflow.common.exception.ErrorCode;
 import com.ticketflow.rule.dto.DispatchRuleSaveRequest;
 import com.ticketflow.rule.dto.SlaRuleSaveRequest;
 import com.ticketflow.rule.dto.TicketCategorySaveRequest;
@@ -68,6 +70,21 @@ public class RuleConfigServiceImpl implements RuleConfigService {
             categoryMapper.updateById(category);
         }
         cacheService.delete(TicketFlowCacheKeys.dictionary("ticket-category:list"));
+        cacheService.deleteByPattern(TicketFlowCacheKeys.hotStatsPattern());
+        return category;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public TicketCategory updateCategoryEnabled(Long id, Integer enabled) {
+        TicketCategory category = categoryMapper.selectById(id);
+        if (category == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "工单分类不存在");
+        }
+        category.setEnabled(normalizeEnabled(enabled));
+        categoryMapper.updateById(category);
+        cacheService.delete(TicketFlowCacheKeys.dictionary("ticket-category:list"));
+        cacheService.deleteByPattern(TicketFlowCacheKeys.hotStatsPattern());
         return category;
     }
 
@@ -96,6 +113,18 @@ public class RuleConfigServiceImpl implements RuleConfigService {
         } else {
             dispatchRuleMapper.updateById(rule);
         }
+        return rule;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DispatchRule updateDispatchRuleEnabled(Long id, Integer enabled) {
+        DispatchRule rule = dispatchRuleMapper.selectById(id);
+        if (rule == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "派单规则不存在");
+        }
+        rule.setEnabled(normalizeEnabled(enabled));
+        dispatchRuleMapper.updateById(rule);
         return rule;
     }
 
@@ -129,5 +158,25 @@ public class RuleConfigServiceImpl implements RuleConfigService {
         }
         cacheService.delete(TicketFlowCacheKeys.dictionary("sla-rule:list"));
         return rule;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SlaRule updateSlaRuleEnabled(Long id, Integer enabled) {
+        SlaRule rule = slaRuleMapper.selectById(id);
+        if (rule == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "SLA 规则不存在");
+        }
+        rule.setEnabled(normalizeEnabled(enabled));
+        slaRuleMapper.updateById(rule);
+        cacheService.delete(TicketFlowCacheKeys.dictionary("sla-rule:list"));
+        return rule;
+    }
+
+    private Integer normalizeEnabled(Integer enabled) {
+        if (enabled == null || (enabled != 0 && enabled != 1)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "启用状态只能是 0 或 1");
+        }
+        return enabled;
     }
 }

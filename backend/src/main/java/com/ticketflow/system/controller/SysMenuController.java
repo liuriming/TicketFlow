@@ -1,6 +1,7 @@
 package com.ticketflow.system.controller;
 
 import com.ticketflow.common.web.ApiResult;
+import com.ticketflow.common.web.StatusUpdateRequest;
 import com.ticketflow.system.annotation.RequirePermission;
 import com.ticketflow.system.dto.SysMenuSaveRequest;
 import com.ticketflow.system.entity.SysMenu;
@@ -41,12 +42,23 @@ public class SysMenuController {
     }
 
     @PostMapping
+    @RequirePermission("system:menu:write")
     public ApiResult<SysMenu> create(@Valid @RequestBody SysMenuSaveRequest request) {
         return ApiResult.success(menuService.saveMenu(null, request));
     }
 
     @PutMapping("/{id}")
+    @RequirePermission("system:menu:write")
     public ApiResult<SysMenu> update(@PathVariable Long id, @Valid @RequestBody SysMenuSaveRequest request) {
         return ApiResult.success(menuService.saveMenu(id, request));
+    }
+
+    @PutMapping("/{id}/enabled")
+    @RequirePermission("system:menu:write")
+    public ApiResult<SysMenu> updateEnabled(
+            @PathVariable Long id,
+            @Valid @RequestBody StatusUpdateRequest request
+    ) {
+        return ApiResult.success(menuService.updateEnabled(id, request.enabled()));
     }
 }

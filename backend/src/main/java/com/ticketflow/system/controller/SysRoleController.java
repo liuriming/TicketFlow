@@ -1,6 +1,7 @@
 package com.ticketflow.system.controller;
 
 import com.ticketflow.common.web.ApiResult;
+import com.ticketflow.common.web.StatusUpdateRequest;
 import com.ticketflow.system.annotation.RequirePermission;
 import com.ticketflow.system.dto.SysRoleDetailResponse;
 import com.ticketflow.system.dto.SysRoleSaveRequest;
@@ -42,13 +43,24 @@ public class SysRoleController {
     }
 
     @PostMapping
+    @RequirePermission("system:role:write")
     public ApiResult<SysRoleDetailResponse> create(@Valid @RequestBody SysRoleSaveRequest request) {
         return ApiResult.success(toDetailResponse(roleService.saveRole(null, request)));
     }
 
     @PutMapping("/{id}")
+    @RequirePermission("system:role:write")
     public ApiResult<SysRoleDetailResponse> update(@PathVariable Long id, @Valid @RequestBody SysRoleSaveRequest request) {
         return ApiResult.success(toDetailResponse(roleService.saveRole(id, request)));
+    }
+
+    @PutMapping("/{id}/enabled")
+    @RequirePermission("system:role:write")
+    public ApiResult<SysRoleDetailResponse> updateEnabled(
+            @PathVariable Long id,
+            @Valid @RequestBody StatusUpdateRequest request
+    ) {
+        return ApiResult.success(toDetailResponse(roleService.updateEnabled(id, request.enabled())));
     }
 
     private SysRoleDetailResponse toDetailResponse(SysRole role) {

@@ -1,6 +1,7 @@
 package com.ticketflow.system.controller;
 
 import com.ticketflow.common.web.ApiResult;
+import com.ticketflow.common.web.StatusUpdateRequest;
 import com.ticketflow.system.annotation.RequirePermission;
 import com.ticketflow.system.dto.SysDeptSaveRequest;
 import com.ticketflow.system.entity.SysDept;
@@ -41,12 +42,23 @@ public class SysDeptController {
     }
 
     @PostMapping
+    @RequirePermission("system:dept:write")
     public ApiResult<SysDept> create(@Valid @RequestBody SysDeptSaveRequest request) {
         return ApiResult.success(deptService.saveDept(null, request));
     }
 
     @PutMapping("/{id}")
+    @RequirePermission("system:dept:write")
     public ApiResult<SysDept> update(@PathVariable Long id, @Valid @RequestBody SysDeptSaveRequest request) {
         return ApiResult.success(deptService.saveDept(id, request));
+    }
+
+    @PutMapping("/{id}/enabled")
+    @RequirePermission("system:dept:write")
+    public ApiResult<SysDept> updateEnabled(
+            @PathVariable Long id,
+            @Valid @RequestBody StatusUpdateRequest request
+    ) {
+        return ApiResult.success(deptService.updateEnabled(id, request.enabled()));
     }
 }

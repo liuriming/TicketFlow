@@ -33,6 +33,15 @@ public interface RuleConfigService {
     TicketCategory saveCategory(Long id, TicketCategorySaveRequest request);
 
     /**
+     * 更新工单分类启用状态。
+     *
+     * @param id 分类 ID。
+     * @param enabled 启用状态：1 启用，0 停用。
+     * @return 更新后的分类。
+     */
+    TicketCategory updateCategoryEnabled(Long id, Integer enabled);
+
+    /**
      * 查询派单规则列表。
      *
      * @return 派单规则列表。
@@ -49,6 +58,15 @@ public interface RuleConfigService {
     DispatchRule saveDispatchRule(Long id, DispatchRuleSaveRequest request);
 
     /**
+     * 更新派单规则启用状态。
+     *
+     * @param id 规则 ID。
+     * @param enabled 启用状态：1 启用，0 停用。
+     * @return 更新后的派单规则。
+     */
+    DispatchRule updateDispatchRuleEnabled(Long id, Integer enabled);
+
+    /**
      * 查询 SLA 规则列表。
      *
      * @return SLA 规则列表。
@@ -63,4 +81,13 @@ public interface RuleConfigService {
      * @return 保存后的 SLA 规则。
      */
     SlaRule saveSlaRule(Long id, SlaRuleSaveRequest request);
+
+    /**
+     * 更新 SLA 规则启用状态。
+     *
+     * @param id 规则 ID。
+     * @param enabled 启用状态：1 启用，0 停用。
+     * @return 更新后的 SLA 规则。
+     */
+    SlaRule updateSlaRuleEnabled(Long id, Integer enabled);
 }

@@ -18,6 +18,11 @@ import com.ticketflow.sla.domain.SlaCalculator;
 import com.ticketflow.sla.domain.SlaDeadline;
 import com.ticketflow.sla.entity.SlaRule;
 import com.ticketflow.sla.mapper.SlaRuleMapper;
+import com.ticketflow.system.domain.PermissionMatcher;
+import com.ticketflow.system.entity.SysDept;
+import com.ticketflow.system.entity.SysUser;
+import com.ticketflow.system.mapper.SysDeptMapper;
+import com.ticketflow.system.mapper.SysUserMapper;
 import com.ticketflow.ticket.domain.TicketDataScopeSupport;
 import com.ticketflow.ticket.domain.TicketWorkflowEngine;
 import com.ticketflow.ticket.dto.TicketActionRequest;
@@ -31,8 +36,11 @@ import com.ticketflow.ticket.dto.TicketListItemResponse;
 import com.ticketflow.ticket.dto.TicketTransferRequest;
 import com.ticketflow.ticket.entity.Ticket;
 import com.ticketflow.ticket.entity.TicketComment;
+import com.ticketflow.ticket.entity.TicketCategory;
 import com.ticketflow.ticket.entity.TicketFlowRecord;
+import com.ticketflow.ticket.enums.TicketAllowedAction;
 import com.ticketflow.ticket.enums.TicketStatus;
+import com.ticketflow.ticket.mapper.TicketCategoryMapper;
 import com.ticketflow.ticket.mapper.TicketCommentMapper;
 import com.ticketflow.ticket.mapper.TicketFlowRecordMapper;
 import com.ticketflow.ticket.mapper.TicketMapper;
@@ -44,8 +52,17 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 工单服务实现类。
@@ -64,6 +81,9 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
     private final AutoDispatchService autoDispatchService;
     private final SlaRuleMapper slaRuleMapper;
     private final RedisJsonCacheService cacheService;
+    private final TicketCategoryMapper categoryMapper;
+    private final SysUserMapper userMapper;
+    private final SysDeptMapper deptMapper;
 
     @Override
     public PageResult<TicketListItemResponse> pageTickets(long pageNo, long pageSize, TicketStatus status, String keyword) {
@@ -81,8 +101,9 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
         ticketDataScopeSupport.apply(query, loginUser);
         query.orderByDesc(Ticket::getCreatedAt).orderByDesc(Ticket::getId);
         IPage<Ticket> page = page(Page.of(pageNo, pageSize), query);
+        TicketDisplayContext displayContext = buildDisplayContext(page.getRecords());
         List<TicketListItemResponse> records = page.getRecords().stream()
-                .map(this::toListItemResponse)
+                .map(ticket -> toListItemResponse(ticket, displayContext, loginUser))
                 .toList();
         return new PageResult<>(records, page.getTotal(), pageNo, pageSize);
     }
@@ -132,7 +153,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
                 .stream()
                 .map(this::toCommentResponse)
                 .toList();
-        return toDetailResponse(ticket, flowRecords, comments);
+        return toDetailResponse(ticket, flowRecords, comments, buildDisplayContext(List.of(ticket)), CurrentUserContext.getRequired());
     }
 
     @Override
@@ -291,7 +312,9 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
     private TicketDetailResponse toDetailResponse(
             Ticket ticket,
             List<TicketFlowRecordResponse> flowRecords,
-            List<TicketCommentResponse> comments
+            List<TicketCommentResponse> comments,
+            TicketDisplayContext displayContext,
+            LoginUser loginUser
     ) {
         return new TicketDetailResponse(
                 ticket.getId(),
@@ -299,34 +322,150 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
                 ticket.getTitle(),
                 ticket.getDescription(),
                 ticket.getCategoryId(),
+                displayContext.categoryName(ticket.getCategoryId()),
                 ticket.getPriority(),
                 ticket.getStatus(),
                 ticket.getCreatorId(),
+                displayContext.userName(ticket.getCreatorId()),
                 ticket.getCreatorDeptId(),
+                displayContext.deptName(ticket.getCreatorDeptId()),
                 ticket.getAssigneeId(),
+                displayContext.userName(ticket.getAssigneeId()),
                 ticket.getResponseDeadline(),
                 ticket.getResolveDeadline(),
                 ticket.getRespondedAt(),
                 ticket.getClosedAt(),
                 flowRecords,
-                comments
+                comments,
+                allowedActions(ticket, loginUser)
         );
     }
 
-    private TicketListItemResponse toListItemResponse(Ticket ticket) {
+    private TicketListItemResponse toListItemResponse(
+            Ticket ticket,
+            TicketDisplayContext displayContext,
+            LoginUser loginUser
+    ) {
         return new TicketListItemResponse(
                 ticket.getId(),
                 ticket.getTicketNo(),
                 ticket.getTitle(),
                 ticket.getCategoryId(),
+                displayContext.categoryName(ticket.getCategoryId()),
                 ticket.getPriority(),
                 ticket.getStatus(),
                 ticket.getCreatorId(),
+                displayContext.userName(ticket.getCreatorId()),
+                displayContext.deptName(ticket.getCreatorDeptId()),
                 ticket.getAssigneeId(),
+                displayContext.userName(ticket.getAssigneeId()),
                 ticket.getResponseDeadline(),
                 ticket.getResolveDeadline(),
-                ticket.getCreatedAt()
+                ticket.getCreatedAt(),
+                allowedActions(ticket, loginUser)
         );
+    }
+
+    private TicketDisplayContext buildDisplayContext(List<Ticket> tickets) {
+        if (tickets == null || tickets.isEmpty()) {
+            return new TicketDisplayContext(Map.of(), Map.of(), Map.of());
+        }
+        Set<Long> categoryIds = tickets.stream()
+                .map(Ticket::getCategoryId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> userIds = tickets.stream()
+                .flatMap(ticket -> Stream.of(ticket.getCreatorId(), ticket.getAssigneeId()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> deptIds = new HashSet<>();
+        tickets.stream()
+                .map(Ticket::getCreatorDeptId)
+                .filter(Objects::nonNull)
+                .forEach(deptIds::add);
+
+        Map<Long, TicketCategory> categories = categoryIds.isEmpty()
+                ? Map.of()
+                : categoryMapper.selectBatchIds(categoryIds).stream()
+                .collect(Collectors.toMap(TicketCategory::getId, Function.identity()));
+        Map<Long, SysUser> users = userIds.isEmpty()
+                ? Map.of()
+                : userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(SysUser::getId, Function.identity()));
+        users.values().stream()
+                .map(SysUser::getDeptId)
+                .filter(Objects::nonNull)
+                .forEach(deptIds::add);
+        Map<Long, SysDept> depts = deptIds.isEmpty()
+                ? Map.of()
+                : deptMapper.selectBatchIds(deptIds).stream()
+                .collect(Collectors.toMap(SysDept::getId, Function.identity()));
+        return new TicketDisplayContext(categories, users, depts);
+    }
+
+    private List<TicketAllowedAction> allowedActions(Ticket ticket, LoginUser loginUser) {
+        List<TicketAllowedAction> actions = new ArrayList<>();
+        Long userId = loginUser.userId();
+        if (Objects.equals(ticket.getAssigneeId(), userId)
+                && ticket.getStatus() == TicketStatus.PENDING_ACCEPT
+                && hasPermission(loginUser, "ticket:accept")) {
+            actions.add(TicketAllowedAction.ACCEPT);
+        }
+        if (Objects.equals(ticket.getAssigneeId(), userId)
+                && ticket.getStatus() == TicketStatus.PROCESSING
+                && hasPermission(loginUser, "ticket:process")) {
+            actions.add(TicketAllowedAction.PROCESS);
+        }
+        if (ticket.getStatus() != TicketStatus.CLOSED
+                && ticket.getStatus() != TicketStatus.CANCELED
+                && hasPermission(loginUser, "ticket:transfer")) {
+            actions.add(TicketAllowedAction.TRANSFER);
+        }
+        if (Objects.equals(ticket.getCreatorId(), userId)
+                && ticket.getStatus() == TicketStatus.PENDING_CONFIRM
+                && hasPermission(loginUser, "ticket:confirm-close")) {
+            actions.add(TicketAllowedAction.CONFIRM_CLOSE);
+            actions.add(TicketAllowedAction.REJECT);
+        }
+        if (Objects.equals(ticket.getCreatorId(), userId)
+                && ticket.getStatus() != TicketStatus.CLOSED
+                && ticket.getStatus() != TicketStatus.CANCELED
+                && hasPermission(loginUser, "ticket:cancel")) {
+            actions.add(TicketAllowedAction.CANCEL);
+        }
+        if (hasPermission(loginUser, "ticket:comment")) {
+            actions.add(TicketAllowedAction.COMMENT);
+        }
+        if (hasPermission(loginUser, "ticket:attachment:upload")) {
+            actions.add(TicketAllowedAction.UPLOAD_ATTACHMENT);
+        }
+        return actions;
+    }
+
+    private boolean hasPermission(LoginUser loginUser, String permission) {
+        return PermissionMatcher.hasAnyPermission(loginUser.permissions(), permission);
+    }
+
+    private record TicketDisplayContext(
+            Map<Long, TicketCategory> categories,
+            Map<Long, SysUser> users,
+            Map<Long, SysDept> depts
+    ) {
+
+        private String categoryName(Long categoryId) {
+            TicketCategory category = categories.get(categoryId);
+            return category == null ? null : category.getCategoryName();
+        }
+
+        private String userName(Long userId) {
+            SysUser user = users.get(userId);
+            return user == null ? null : user.getRealName();
+        }
+
+        private String deptName(Long deptId) {
+            SysDept dept = depts.get(deptId);
+            return dept == null ? null : dept.getDeptName();
+        }
     }
 
     private TicketFlowRecordResponse toFlowRecordResponse(TicketFlowRecord record) {

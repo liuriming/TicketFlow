@@ -12,37 +12,93 @@
     <section class="work-surface">
       <div class="section-title">
         <h2>待处理工单</h2>
-        <el-button type="primary" :icon="Plus">新建工单</el-button>
+        <el-button type="primary" :icon="Plus" @click="$router.push('/tickets/list')">新建工单</el-button>
       </div>
-      <el-table :data="tickets" height="360">
-        <el-table-column prop="no" label="工单编号" width="140" />
+      <el-table v-loading="loading" :data="tickets" height="360">
+        <el-table-column prop="ticketNo" label="工单编号" width="160" />
         <el-table-column prop="title" label="标题" min-width="220" />
-        <el-table-column prop="priority" label="优先级" width="110">
+        <el-table-column label="优先级" width="110">
           <template #default="{ row }">
-            <el-tag :type="row.priorityType">{{ row.priority }}</el-tag>
+            <el-tag :type="priorityType(row.priority)">{{ priorityText(row.priority) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="120" />
-        <el-table-column prop="assignee" label="处理人" width="120" />
-        <el-table-column prop="deadline" label="SLA 截止" width="180" />
+        <el-table-column label="状态" width="120">
+          <template #default="{ row }">{{ statusText(row.status) }}</template>
+        </el-table-column>
+        <el-table-column label="处理人" width="120">
+          <template #default="{ row }">{{ row.assigneeName || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="resolveDeadline" label="SLA 截止" width="180" />
       </el-table>
     </section>
   </div>
 </template>
 
 <script setup>
+import { computed, onMounted, ref } from 'vue'
 import { Clock, Finished, Plus, Tickets, Warning } from '@element-plus/icons-vue'
+import { getDashboardSummary } from '../api/report'
+import { pageTickets } from '../api/ticket'
 
-const metrics = [
-  { label: '今日新增', value: '18', trend: '较昨日 +4', icon: Tickets },
-  { label: '处理中', value: '42', trend: '12 个即将超时', icon: Clock },
-  { label: '已关闭', value: '126', trend: '本周累计', icon: Finished },
-  { label: '超时提醒', value: '5', trend: '需主管关注', icon: Warning }
-]
+const loading = ref(false)
+const summary = ref({
+  todayCreatedCount: 0,
+  processingCount: 0,
+  closedCount: 0,
+  overdueCount: 0
+})
+const tickets = ref([])
 
-const tickets = [
-  { no: 'TF20260630001', title: '研发区网络间歇性中断', priority: '紧急', priorityType: 'danger', status: '待接单', assignee: '李运维', deadline: '2026-06-30 11:30' },
-  { no: 'TF20260630002', title: '新员工账号权限开通', priority: '中', priorityType: 'warning', status: '处理中', assignee: '周工程师', deadline: '2026-06-30 18:00' },
-  { no: 'TF20260630003', title: '会议室投屏设备无信号', priority: '低', priorityType: 'info', status: '待确认', assignee: '王工', deadline: '2026-07-01 12:00' }
-]
+const metrics = computed(() => [
+  { label: '今日新增', value: summary.value.todayCreatedCount, trend: '当前数据范围', icon: Tickets },
+  { label: '待处理', value: summary.value.processingCount, trend: '待分派/待接单/处理中/待确认', icon: Clock },
+  { label: '已关闭', value: summary.value.closedCount, trend: '累计关闭', icon: Finished },
+  { label: '超时提醒', value: summary.value.overdueCount, trend: '按处理截止统计', icon: Warning }
+])
+
+const statusMap = {
+  PENDING_ASSIGN: '待分派',
+  PENDING_ACCEPT: '待接单',
+  PROCESSING: '处理中',
+  PENDING_CONFIRM: '待确认',
+  CLOSED: '已关闭',
+  REJECTED: '已驳回',
+  CANCELED: '已取消'
+}
+
+const priorityMap = {
+  LOW: '低',
+  MEDIUM: '中',
+  HIGH: '高',
+  URGENT: '紧急'
+}
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const [summaryData, ticketPage] = await Promise.all([
+      getDashboardSummary(),
+      pageTickets({ pageNo: 1, pageSize: 8 })
+    ])
+    summary.value = summaryData
+    tickets.value = ticketPage.records || []
+  } finally {
+    loading.value = false
+  }
+})
+
+function statusText(value) {
+  return statusMap[value] || value || '-'
+}
+
+function priorityText(value) {
+  return priorityMap[value] || value || '-'
+}
+
+function priorityType(value) {
+  if (value === 'URGENT') return 'danger'
+  if (value === 'HIGH') return 'warning'
+  if (value === 'LOW') return 'info'
+  return 'success'
+}
 </script>
