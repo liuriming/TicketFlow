@@ -1,0 +1,45 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ticketflow-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/ticketflow?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ticketflow
+    password: ticketflow123
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ticketflow123
+      database: 0
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: ticketflow
+    password: ticketflow123
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+minio:
+  endpoint: http://localhost:9000
+  access-key: ticketflow
+  secret-key: ticketflow123
+  bucket: ticketflow
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
