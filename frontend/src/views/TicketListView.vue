@@ -15,7 +15,9 @@
       <el-table-column type="selection" width="48" />
       <el-table-column prop="ticketNo" label="工单编号" width="170" />
       <el-table-column prop="title" label="标题" min-width="220" />
-      <el-table-column prop="categoryId" label="分类 ID" width="100" />
+      <el-table-column label="分类" width="130">
+        <template #default="{ row }">{{ row.categoryName || `分类 ${row.categoryId}` }}</template>
+      </el-table-column>
       <el-table-column label="优先级" width="110">
         <template #default="{ row }">
           <el-tag :type="priorityType(row.priority)">{{ priorityText(row.priority) }}</el-tag>
@@ -24,18 +26,22 @@
       <el-table-column label="状态" width="120">
         <template #default="{ row }">{{ statusText(row.status) }}</template>
       </el-table-column>
-      <el-table-column prop="creatorId" label="提交人 ID" width="110" />
-      <el-table-column prop="assigneeId" label="处理人 ID" width="110" />
+      <el-table-column label="提交人" width="120">
+        <template #default="{ row }">{{ row.creatorName || `用户 ${row.creatorId}` }}</template>
+      </el-table-column>
+      <el-table-column label="处理人" width="120">
+        <template #default="{ row }">{{ row.assigneeName || '-' }}</template>
+      </el-table-column>
       <el-table-column prop="resolveDeadline" label="处理截止" width="180" />
       <el-table-column label="操作" fixed="right" width="360">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-          <el-button link type="primary" @click="quickAction(row, 'accept')">接单</el-button>
-          <el-button link type="primary" @click="openProcess(row)">处理</el-button>
-          <el-button v-if="canTransfer" link type="primary" @click="openTransfer(row)">转派</el-button>
-          <el-button link type="success" @click="quickAction(row, 'close')">关闭</el-button>
-          <el-button link type="warning" @click="quickAction(row, 'reject')">驳回</el-button>
-          <el-button link type="danger" @click="quickAction(row, 'cancel')">取消</el-button>
+          <el-button v-if="hasAction(row, 'ACCEPT')" link type="primary" @click="quickAction(row, 'accept')">接单</el-button>
+          <el-button v-if="hasAction(row, 'PROCESS')" link type="primary" @click="openProcess(row)">处理</el-button>
+          <el-button v-if="hasAction(row, 'TRANSFER')" link type="primary" @click="openTransfer(row)">转派</el-button>
+          <el-button v-if="hasAction(row, 'CONFIRM_CLOSE')" link type="success" @click="quickAction(row, 'close')">关闭</el-button>
+          <el-button v-if="hasAction(row, 'REJECT')" link type="warning" @click="quickAction(row, 'reject')">驳回</el-button>
+          <el-button v-if="hasAction(row, 'CANCEL')" link type="danger" @click="quickAction(row, 'cancel')">取消</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -55,8 +61,10 @@
         <el-form-item label="标题">
           <el-input v-model="createForm.title" placeholder="请输入工单标题" />
         </el-form-item>
-        <el-form-item label="分类 ID">
-          <el-input-number v-model="createForm.categoryId" :min="1" />
+        <el-form-item label="工单分类">
+          <el-select v-model="createForm.categoryId" filterable>
+            <el-option v-for="item in categories" :key="item.id" :label="item.categoryName" :value="item.id" />
+          </el-select>
         </el-form-item>
         <el-form-item label="优先级">
           <el-select v-model="createForm.priority">
@@ -86,8 +94,15 @@
 
     <el-dialog v-model="transferDialogVisible" title="转派工单" width="520px">
       <el-form :model="transferForm" label-width="90px">
-        <el-form-item label="处理人 ID">
-          <el-input-number v-model="transferForm.assigneeId" :min="1" />
+        <el-form-item label="处理人">
+          <el-select v-model="transferForm.assigneeId" filterable>
+            <el-option
+              v-for="user in userOptions"
+              :key="user.id"
+              :label="`${user.realName}（${user.deptName || '未分配部门'}）`"
+              :value="user.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="转派原因">
           <el-input v-model="transferForm.reason" type="textarea" :rows="4" />
@@ -104,8 +119,11 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="工单编号">{{ ticketDetail.ticketNo }}</el-descriptions-item>
           <el-descriptions-item label="状态">{{ statusText(ticketDetail.status) }}</el-descriptions-item>
+          <el-descriptions-item label="分类">{{ ticketDetail.categoryName || `分类 ${ticketDetail.categoryId}` }}</el-descriptions-item>
           <el-descriptions-item label="优先级">{{ priorityText(ticketDetail.priority) }}</el-descriptions-item>
-          <el-descriptions-item label="处理人 ID">{{ ticketDetail.assigneeId || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="提交人">{{ ticketDetail.creatorName || `用户 ${ticketDetail.creatorId}` }}</el-descriptions-item>
+          <el-descriptions-item label="提交部门">{{ ticketDetail.creatorDeptName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="处理人">{{ ticketDetail.assigneeName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="响应截止">{{ ticketDetail.responseDeadline || '-' }}</el-descriptions-item>
           <el-descriptions-item label="处理截止">{{ ticketDetail.resolveDeadline || '-' }}</el-descriptions-item>
         </el-descriptions>
@@ -149,7 +167,7 @@
         <div class="detail-block">
           <div class="detail-title-line">
             <h2>附件</h2>
-            <el-upload :http-request="handleAttachmentUpload" :show-file-list="false">
+            <el-upload v-if="hasDetailAction('UPLOAD_ATTACHMENT')" :http-request="handleAttachmentUpload" :show-file-list="false">
               <el-button :icon="Upload" size="small">上传附件</el-button>
             </el-upload>
           </div>
@@ -177,9 +195,12 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Upload } from '@element-plus/icons-vue'
 import { deleteAttachment, downloadAttachment, listAttachments, uploadAttachment } from '../api/attachment'
-import { useAuthStore } from '../stores/auth'
+import { useRoute } from 'vue-router'
+import { listCategories } from '../api/rule'
+import { listUserOptions } from '../api/system'
 import {
   acceptTicket,
+  addTicketComment,
   cancelTicket,
   confirmCloseTicket,
   createTicket,
@@ -190,7 +211,7 @@ import {
   transferTicket
 } from '../api/ticket'
 
-const auth = useAuthStore()
+const route = useRoute()
 const status = ref('')
 const tickets = ref([])
 const total = ref(0)
@@ -206,7 +227,8 @@ const processDialogVisible = ref(false)
 const transferDialogVisible = ref(false)
 const processResult = ref('')
 const detailTitle = computed(() => ticketDetail.value ? `${ticketDetail.value.ticketNo} · ${ticketDetail.value.title}` : '工单详情')
-const canTransfer = computed(() => auth.user?.permissions?.includes('ticket:transfer'))
+const categories = ref([])
+const userOptions = ref([])
 
 const query = reactive({
   pageNo: 1,
@@ -254,7 +276,34 @@ watch(status, () => {
   loadTickets()
 })
 
-onMounted(loadTickets)
+watch(
+  () => route.query.ticketId,
+  async (ticketId) => {
+    if (ticketId) {
+      await openDetailById(ticketId)
+    }
+  }
+)
+
+onMounted(async () => {
+  await loadOptions()
+  await loadTickets()
+  if (route.query.ticketId) {
+    await openDetailById(route.query.ticketId)
+  }
+})
+
+async function loadOptions() {
+  const [categoryRows, userRows] = await Promise.all([
+    listCategories().catch(() => []),
+    listUserOptions().catch(() => [])
+  ])
+  categories.value = categoryRows || []
+  userOptions.value = userRows || []
+  if (categories.value.length && !createForm.categoryId) {
+    createForm.categoryId = categories.value[0].id
+  }
+}
 
 async function loadTickets() {
   loading.value = true
@@ -349,6 +398,12 @@ async function openDetail(row) {
   await refreshDetail(row.id)
 }
 
+async function openDetailById(id) {
+  currentTicket.value = { id: Number(id) }
+  detailVisible.value = true
+  await refreshDetail(Number(id))
+}
+
 async function refreshDetail(id = currentTicket.value?.id) {
   if (!id) return
   detailLoading.value = true
@@ -436,6 +491,14 @@ function priorityType(value) {
   if (value === 'HIGH') return 'warning'
   if (value === 'LOW') return 'info'
   return 'success'
+}
+
+function hasAction(row, action) {
+  return (row.allowedActions || []).includes(action)
+}
+
+function hasDetailAction(action) {
+  return (ticketDetail.value?.allowedActions || []).includes(action)
 }
 
 function fileSize(value) {

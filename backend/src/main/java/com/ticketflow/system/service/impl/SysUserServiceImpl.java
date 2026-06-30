@@ -4,11 +4,16 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ticketflow.common.cache.RedisJsonCacheService;
 import com.ticketflow.common.cache.TicketFlowCacheKeys;
+import com.ticketflow.common.exception.BusinessException;
+import com.ticketflow.common.exception.ErrorCode;
 import com.ticketflow.common.util.PasswordHashUtil;
 import com.ticketflow.system.dto.SysUserSaveRequest;
+import com.ticketflow.system.dto.UserOptionResponse;
+import com.ticketflow.system.entity.SysDept;
 import com.ticketflow.system.entity.SysUser;
 import com.ticketflow.system.entity.SysUserRole;
 import com.ticketflow.system.enums.UserStatus;
+import com.ticketflow.system.mapper.SysDeptMapper;
 import com.ticketflow.system.mapper.SysUserMapper;
 import com.ticketflow.system.mapper.SysUserRoleMapper;
 import com.ticketflow.system.service.SysUserService;
@@ -18,7 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 用户服务实现类。
@@ -31,6 +40,7 @@ import java.util.UUID;
 public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
 
     private final SysUserRoleMapper userRoleMapper;
+    private final SysDeptMapper deptMapper;
     private final RedisJsonCacheService cacheService;
 
     @Override
@@ -80,5 +90,65 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
                 .stream()
                 .map(SysUserRole::getRoleId)
                 .toList();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SysUser updateStatus(Long id, UserStatus status) {
+        if (status == null) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "用户状态不能为空");
+        }
+        SysUser user = getRequired(id);
+        user.setStatus(status);
+        updateById(user);
+        cacheService.delete(TicketFlowCacheKeys.permissionUser(user.getId()));
+        return user;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SysUser resetPassword(Long id, String password) {
+        if (!StringUtils.hasText(password)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "新密码不能为空");
+        }
+        SysUser user = getRequired(id);
+        String salt = UUID.randomUUID().toString().replace("-", "");
+        user.setPasswordSalt(salt);
+        user.setPasswordHash(PasswordHashUtil.sha256(password, salt));
+        updateById(user);
+        cacheService.delete(TicketFlowCacheKeys.permissionUser(user.getId()));
+        return user;
+    }
+
+    @Override
+    public List<UserOptionResponse> listUserOptions() {
+        List<SysUser> users = list(Wrappers.<SysUser>lambdaQuery()
+                .eq(SysUser::getStatus, UserStatus.ENABLED)
+                .orderByAsc(SysUser::getDeptId)
+                .orderByAsc(SysUser::getId));
+        Map<Long, SysDept> deptMap = users.stream()
+                .map(SysUser::getDeptId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.collectingAndThen(Collectors.toSet(), deptIds -> deptIds.isEmpty()
+                        ? Map.of()
+                        : deptMapper.selectBatchIds(deptIds).stream()
+                        .collect(Collectors.toMap(SysDept::getId, Function.identity()))));
+        return users.stream()
+                .map(user -> new UserOptionResponse(
+                        user.getId(),
+                        user.getUsername(),
+                        user.getRealName(),
+                        user.getDeptId(),
+                        deptMap.containsKey(user.getDeptId()) ? deptMap.get(user.getDeptId()).getDeptName() : null
+                ))
+                .toList();
+    }
+
+    private SysUser getRequired(Long id) {
+        SysUser user = getById(id);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        }
+        return user;
     }
 }

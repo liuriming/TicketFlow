@@ -1,6 +1,7 @@
 package com.ticketflow.rule.controller;
 
 import com.ticketflow.common.web.ApiResult;
+import com.ticketflow.common.web.StatusUpdateRequest;
 import com.ticketflow.rule.dto.DispatchRuleSaveRequest;
 import com.ticketflow.rule.dto.SlaRuleSaveRequest;
 import com.ticketflow.rule.dto.TicketCategorySaveRequest;
@@ -40,18 +41,27 @@ public class RuleController {
     }
 
     @PostMapping("/categories")
-    @RequirePermission("ticket:category:list")
+    @RequirePermission("ticket:category:write")
     public ApiResult<TicketCategory> createCategory(@Valid @RequestBody TicketCategorySaveRequest request) {
         return ApiResult.success(ruleConfigService.saveCategory(null, request));
     }
 
     @PutMapping("/categories/{id}")
-    @RequirePermission("ticket:category:list")
+    @RequirePermission("ticket:category:write")
     public ApiResult<TicketCategory> updateCategory(
             @PathVariable Long id,
             @Valid @RequestBody TicketCategorySaveRequest request
     ) {
         return ApiResult.success(ruleConfigService.saveCategory(id, request));
+    }
+
+    @PutMapping("/categories/{id}/enabled")
+    @RequirePermission("ticket:category:write")
+    public ApiResult<TicketCategory> updateCategoryEnabled(
+            @PathVariable Long id,
+            @Valid @RequestBody StatusUpdateRequest request
+    ) {
+        return ApiResult.success(ruleConfigService.updateCategoryEnabled(id, request.enabled()));
     }
 
     @GetMapping("/dispatch")
@@ -61,18 +71,27 @@ public class RuleController {
     }
 
     @PostMapping("/dispatch")
-    @RequirePermission("rule:dispatch:list")
+    @RequirePermission("rule:dispatch:write")
     public ApiResult<DispatchRule> createDispatchRule(@RequestBody DispatchRuleSaveRequest request) {
         return ApiResult.success(ruleConfigService.saveDispatchRule(null, request));
     }
 
     @PutMapping("/dispatch/{id}")
-    @RequirePermission("rule:dispatch:list")
+    @RequirePermission("rule:dispatch:write")
     public ApiResult<DispatchRule> updateDispatchRule(
             @PathVariable Long id,
             @RequestBody DispatchRuleSaveRequest request
     ) {
         return ApiResult.success(ruleConfigService.saveDispatchRule(id, request));
+    }
+
+    @PutMapping("/dispatch/{id}/enabled")
+    @RequirePermission("rule:dispatch:write")
+    public ApiResult<DispatchRule> updateDispatchRuleEnabled(
+            @PathVariable Long id,
+            @Valid @RequestBody StatusUpdateRequest request
+    ) {
+        return ApiResult.success(ruleConfigService.updateDispatchRuleEnabled(id, request.enabled()));
     }
 
     @GetMapping("/sla")
@@ -82,17 +101,26 @@ public class RuleController {
     }
 
     @PostMapping("/sla")
-    @RequirePermission("rule:sla:list")
+    @RequirePermission("rule:sla:write")
     public ApiResult<SlaRule> createSlaRule(@Valid @RequestBody SlaRuleSaveRequest request) {
         return ApiResult.success(ruleConfigService.saveSlaRule(null, request));
     }
 
     @PutMapping("/sla/{id}")
-    @RequirePermission("rule:sla:list")
+    @RequirePermission("rule:sla:write")
     public ApiResult<SlaRule> updateSlaRule(
             @PathVariable Long id,
             @Valid @RequestBody SlaRuleSaveRequest request
     ) {
         return ApiResult.success(ruleConfigService.saveSlaRule(id, request));
+    }
+
+    @PutMapping("/sla/{id}/enabled")
+    @RequirePermission("rule:sla:write")
+    public ApiResult<SlaRule> updateSlaRuleEnabled(
+            @PathVariable Long id,
+            @Valid @RequestBody StatusUpdateRequest request
+    ) {
+        return ApiResult.success(ruleConfigService.updateSlaRuleEnabled(id, request.enabled()));
     }
 }

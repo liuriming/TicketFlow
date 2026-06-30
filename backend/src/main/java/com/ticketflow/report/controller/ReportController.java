@@ -1,6 +1,8 @@
 package com.ticketflow.report.controller;
 
 import com.ticketflow.common.web.ApiResult;
+import com.ticketflow.report.dto.DashboardSummaryResponse;
+import com.ticketflow.report.dto.ReportCategoryDistributionResponse;
 import com.ticketflow.report.dto.ReportOverviewResponse;
 import com.ticketflow.report.dto.WorkloadResponse;
 import com.ticketflow.report.service.ReportService;
@@ -28,6 +30,16 @@ public class ReportController {
     @GetMapping("/overview")
     public ApiResult<ReportOverviewResponse> overview() {
         return ApiResult.success(reportService.overview());
+    }
+
+    @GetMapping("/dashboard")
+    public ApiResult<DashboardSummaryResponse> dashboard() {
+        return ApiResult.success(reportService.dashboard());
+    }
+
+    @GetMapping("/category-distribution")
+    public ApiResult<List<ReportCategoryDistributionResponse>> categoryDistribution() {
+        return ApiResult.success(reportService.categoryDistribution());
     }
 
     @GetMapping("/workload")

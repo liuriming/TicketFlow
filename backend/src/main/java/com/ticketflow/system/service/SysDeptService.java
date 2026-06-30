@@ -19,4 +19,13 @@ public interface SysDeptService extends IService<SysDept> {
      * @return 保存后的部门实体。
      */
     SysDept saveDept(Long id, SysDeptSaveRequest request);
+
+    /**
+     * 更新部门启用状态。
+     *
+     * @param id 部门 ID。
+     * @param enabled 启用状态：1 启用，0 停用。
+     * @return 更新后的部门实体。
+     */
+    SysDept updateEnabled(Long id, Integer enabled);
 }

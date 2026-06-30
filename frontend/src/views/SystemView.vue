@@ -23,12 +23,16 @@
       <el-table-column prop="phone" label="手机号" width="140" />
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'ENABLED' ? 'success' : 'info'">{{ userStatusText(row.status) }}</el-tag>
+          <el-switch
+            :model-value="row.status === 'ENABLED'"
+            @change="(value) => toggleUserStatus(row, value)"
+          />
         </template>
       </el-table-column>
-      <el-table-column label="操作" fixed="right" width="120">
+      <el-table-column label="操作" fixed="right" width="190">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+          <el-button link type="warning" @click="openResetPassword(row)">重置密码</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -44,7 +48,7 @@
       </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.enabled === 1 ? 'success' : 'info'">{{ row.enabled === 1 ? '启用' : '停用' }}</el-tag>
+          <el-switch :model-value="row.enabled === 1" @change="(value) => toggleEnabled(row, value)" />
         </template>
       </el-table-column>
       <el-table-column label="操作" fixed="right" width="120">
@@ -60,9 +64,9 @@
       <el-table-column prop="path" label="路由路径" min-width="190" />
       <el-table-column prop="permission" label="权限标识" min-width="190" />
       <el-table-column prop="sortOrder" label="排序" width="90" />
-      <el-table-column label="显示" width="90">
+      <el-table-column label="启用" width="90">
         <template #default="{ row }">
-          <el-switch :model-value="row.visible === 1" disabled />
+          <el-switch :model-value="row.visible === 1" @change="(value) => toggleEnabled(row, value)" />
         </template>
       </el-table-column>
       <el-table-column label="操作" fixed="right" width="120">
@@ -79,7 +83,7 @@
       <el-table-column prop="sortOrder" label="排序" width="90" />
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.enabled === 1 ? 'success' : 'info'">{{ row.enabled === 1 ? '启用' : '停用' }}</el-tag>
+          <el-switch :model-value="row.enabled === 1" @change="(value) => toggleEnabled(row, value)" />
         </template>
       </el-table-column>
       <el-table-column label="操作" fixed="right" width="120">
@@ -214,7 +218,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import {
   getDept,
@@ -225,10 +229,15 @@ import {
   listMenus,
   listRoles,
   pageUsers,
+  resetUserPassword,
   saveDept,
   saveMenu,
   saveRole,
-  saveUser
+  saveUser,
+  updateDeptEnabled,
+  updateMenuEnabled,
+  updateRoleEnabled,
+  updateUserStatus
 } from '../api/system'
 
 const route = useRoute()
@@ -413,6 +422,39 @@ async function submit() {
   } finally {
     submitting.value = false
   }
+}
+
+async function toggleUserStatus(row, value) {
+  await updateUserStatus(row.id, value ? 'ENABLED' : 'DISABLED')
+  ElMessage.success(value ? '用户已启用' : '用户已停用')
+  await load()
+}
+
+async function toggleEnabled(row, value) {
+  const enabled = value ? 1 : 0
+  if (mode.value === '角色管理') {
+    await updateRoleEnabled(row.id, enabled)
+  } else if (mode.value === '菜单管理') {
+    await updateMenuEnabled(row.id, enabled)
+  } else if (mode.value === '部门管理') {
+    await updateDeptEnabled(row.id, enabled)
+  }
+  ElMessage.success(enabled ? '已启用' : '已停用')
+  await loadOptions()
+  await load()
+}
+
+async function openResetPassword(row) {
+  const result = await ElMessageBox.prompt(`请输入“${row.realName}”的新密码`, '重置密码', {
+    confirmButtonText: '重置',
+    cancelButtonText: '取消',
+    inputType: 'password',
+    inputPattern: /^.{6,}$/,
+    inputErrorMessage: '密码至少 6 位'
+  }).catch(() => null)
+  if (!result) return
+  await resetUserPassword(row.id, result.value)
+  ElMessage.success('密码已重置')
 }
 
 function resetForms() {

@@ -16,6 +16,7 @@
             <span>{{ item.name }}</span>
             <el-progress :percentage="item.value" :stroke-width="12" />
           </div>
+          <el-empty v-if="categoryBars.length === 0" description="暂无分类数据" :image-size="72" />
         </div>
       </div>
       <div>
@@ -34,7 +35,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Histogram, Stopwatch, Tickets, TrendCharts } from '@element-plus/icons-vue'
-import { getReportOverview, getWorkload } from '../api/report'
+import { getCategoryDistribution, getReportOverview, getWorkload } from '../api/report'
 
 const loading = ref(false)
 const overview = ref({
@@ -44,6 +45,7 @@ const overview = ref({
   activeAssigneeCount: 0
 })
 const workload = ref([])
+const categoryDistribution = ref([])
 
 const metrics = computed(() => [
   { label: '工单总数', value: overview.value.ticketCount, sub: '当前数据范围', icon: Tickets },
@@ -52,18 +54,22 @@ const metrics = computed(() => [
   { label: '活跃处理人', value: overview.value.activeAssigneeCount, sub: '已分派工单人员', icon: TrendCharts }
 ])
 
-const categoryBars = [
-  { name: '网络故障', value: 42 },
-  { name: '账号权限', value: 28 },
-  { name: '硬件维修', value: 18 },
-  { name: '服务器问题', value: 12 }
-]
+const categoryBars = computed(() => categoryDistribution.value.map((item) => ({
+  name: `${item.categoryName}（${item.ticketCount}）`,
+  value: Number(item.percentage?.toFixed ? item.percentage.toFixed(1) : item.percentage || 0)
+})))
 
 onMounted(async () => {
   loading.value = true
   try {
-    overview.value = await getReportOverview()
-    workload.value = await getWorkload()
+    const [overviewData, workloadRows, distributionRows] = await Promise.all([
+      getReportOverview(),
+      getWorkload(),
+      getCategoryDistribution()
+    ])
+    overview.value = overviewData
+    workload.value = workloadRows
+    categoryDistribution.value = distributionRows
   } finally {
     loading.value = false
   }

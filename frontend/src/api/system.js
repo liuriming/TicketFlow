@@ -12,6 +12,18 @@ export function saveUser(data, id) {
   return id ? http.put(`/system/users/${id}`, data) : http.post('/system/users', data)
 }
 
+export function listUserOptions() {
+  return http.get('/system/users/options')
+}
+
+export function updateUserStatus(id, status) {
+  return http.put(`/system/users/${id}/status`, { status })
+}
+
+export function resetUserPassword(id, password) {
+  return http.put(`/system/users/${id}/reset-password`, { password })
+}
+
 export function listRoles() {
   return http.get('/system/roles')
 }
@@ -22,6 +34,10 @@ export function getRole(id) {
 
 export function saveRole(data, id) {
   return id ? http.put(`/system/roles/${id}`, data) : http.post('/system/roles', data)
+}
+
+export function updateRoleEnabled(id, enabled) {
+  return http.put(`/system/roles/${id}/enabled`, { enabled })
 }
 
 export function listMenus() {
@@ -36,6 +52,10 @@ export function saveMenu(data, id) {
   return id ? http.put(`/system/menus/${id}`, data) : http.post('/system/menus', data)
 }
 
+export function updateMenuEnabled(id, enabled) {
+  return http.put(`/system/menus/${id}/enabled`, { enabled })
+}
+
 export function listDepts() {
   return http.get('/system/depts')
 }
@@ -46,4 +66,8 @@ export function getDept(id) {
 
 export function saveDept(data, id) {
   return id ? http.put(`/system/depts/${id}`, data) : http.post('/system/depts', data)
+}
+
+export function updateDeptEnabled(id, enabled) {
+  return http.put(`/system/depts/${id}/enabled`, { enabled })
 }

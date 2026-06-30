@@ -1,6 +1,8 @@
 package com.ticketflow.system.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ticketflow.common.exception.BusinessException;
+import com.ticketflow.common.exception.ErrorCode;
 import com.ticketflow.system.dto.SysDeptSaveRequest;
 import com.ticketflow.system.entity.SysDept;
 import com.ticketflow.system.mapper.SysDeptMapper;
@@ -39,5 +41,24 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
         }
         updateById(dept);
         return dept;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SysDept updateEnabled(Long id, Integer enabled) {
+        SysDept dept = getById(id);
+        if (dept == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "部门不存在");
+        }
+        dept.setEnabled(normalizeEnabled(enabled));
+        updateById(dept);
+        return dept;
+    }
+
+    private Integer normalizeEnabled(Integer enabled) {
+        if (enabled == null || (enabled != 0 && enabled != 1)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "启用状态只能是 0 或 1");
+        }
+        return enabled;
     }
 }

@@ -1,6 +1,8 @@
 package com.ticketflow.report.service;
 
 import com.ticketflow.report.dto.ReportOverviewResponse;
+import com.ticketflow.report.dto.DashboardSummaryResponse;
+import com.ticketflow.report.dto.ReportCategoryDistributionResponse;
 import com.ticketflow.report.dto.WorkloadResponse;
 
 import java.util.List;
@@ -18,6 +20,20 @@ public interface ReportService {
      * @return 概览指标。
      */
     ReportOverviewResponse overview();
+
+    /**
+     * 查询工作台汇总指标。
+     *
+     * @return 工作台指标。
+     */
+    DashboardSummaryResponse dashboard();
+
+    /**
+     * 查询工单分类分布。
+     *
+     * @return 分类分布列表。
+     */
+    List<ReportCategoryDistributionResponse> categoryDistribution();
 
     /**
      * 查询人员工作量。
