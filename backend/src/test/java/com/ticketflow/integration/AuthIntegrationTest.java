@@ -476,6 +476,116 @@ class AuthIntegrationTest {
         assertThat(unreadCount()).isEqualTo(unreadBefore);
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void 消息中心支持筛选和批量已读() throws Exception {
+        notificationPublisher.publish(new NotificationEvent(
+                1L,
+                "第三阶段未读通知",
+                "验证消息中心筛选和批量已读",
+                "PHASE3_MESSAGE",
+                93001L,
+                "INFO",
+                "PHASE3_MESSAGE:93001"
+        ));
+
+        Map<String, Object> message = waitForMessage("PHASE3_MESSAGE", 93001L);
+        assertThat(message).isNotNull();
+        assertThat(message.get("readFlag")).isEqualTo(0);
+
+        ResponseEntity<Map> unreadResponse = restTemplate.exchange(
+                url("/api/messages?pageNo=1&pageSize=10&readFlag=0&businessType=PHASE3_MESSAGE"),
+                HttpMethod.GET,
+                new HttpEntity<>(authHeaders()),
+                Map.class
+        );
+        Map<String, Object> unreadPage = data(unreadResponse);
+        List<Map<String, Object>> unreadRecords = (List<Map<String, Object>>) unreadPage.get("records");
+        assertThat(unreadRecords).anySatisfy(record -> {
+            assertThat(record.get("businessType")).isEqualTo("PHASE3_MESSAGE");
+            assertThat(record.get("dedupeKey")).isEqualTo("PHASE3_MESSAGE:93001");
+        });
+
+        ResponseEntity<Map> readAllResponse = restTemplate.postForEntity(
+                url("/api/messages/read-all"),
+                new HttpEntity<>(Map.of("businessType", "PHASE3_MESSAGE"), authHeaders()),
+                Map.class
+        );
+        assertThat(readAllResponse.getBody()).isNotNull();
+        assertThat(readAllResponse.getBody().get("code")).isEqualTo(0);
+
+        ResponseEntity<Map> unreadAfterResponse = restTemplate.exchange(
+                url("/api/messages?pageNo=1&pageSize=10&readFlag=0&businessType=PHASE3_MESSAGE"),
+                HttpMethod.GET,
+                new HttpEntity<>(authHeaders()),
+                Map.class
+        );
+        Map<String, Object> unreadAfterPage = data(unreadAfterResponse);
+        List<Map<String, Object>> unreadAfterRecords = (List<Map<String, Object>>) unreadAfterPage.get("records");
+        assertThat(unreadAfterRecords).noneMatch(record -> "PHASE3_MESSAGE".equals(record.get("businessType")));
+    }
+
+    @Test
+    void 工单关键动作会生成对应站内信() throws Exception {
+        String employeeToken = loginAndToken("employee", "123456");
+        String engineerToken = loginAndToken("ops_engineer", "123456");
+
+        Map<String, Object> ticket = postData("/api/tickets", Map.of(
+                "title", "第三阶段通知工单",
+                "description", "验证工单动作通知",
+                "categoryId", 1,
+                "priority", "MEDIUM"
+        ), employeeToken);
+        Long ticketId = numberValue(ticket.get("id")).longValue();
+
+        Map<String, Object> assignedMessage = waitForMessage("TICKET_ASSIGNED", ticketId, engineerToken);
+        assertThat(assignedMessage).isNotNull();
+        assertThat(assignedMessage.get("title")).isEqualTo("你有新的待接单工单");
+
+        postData("/api/tickets/" + ticketId + "/accept", Map.of(), engineerToken);
+        postData("/api/tickets/" + ticketId + "/process", Map.of(
+                "result", "第三阶段处理完成"
+        ), engineerToken);
+
+        Map<String, Object> processMessage = waitForMessage("TICKET_PENDING_CONFIRM", ticketId, employeeToken);
+        assertThat(processMessage).isNotNull();
+        assertThat(processMessage.get("title")).isEqualTo("工单等待确认");
+
+        postData("/api/tickets/" + ticketId + "/comments", Map.of(
+                "content", "第三阶段补充评论",
+                "internalOnly", false
+        ), employeeToken);
+        Map<String, Object> commentMessage = waitForMessage("TICKET_COMMENTED", ticketId, engineerToken);
+        assertThat(commentMessage).isNotNull();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void 变更类接口会写入操作审计日志() {
+        Map<String, Object> ticket = postData("/api/tickets", Map.of(
+                "title", "第三阶段审计工单",
+                "description", "验证操作审计",
+                "categoryId", 1,
+                "priority", "LOW"
+        ));
+        Long ticketId = numberValue(ticket.get("id")).longValue();
+
+        ResponseEntity<Map> logResponse = restTemplate.exchange(
+                url("/api/audit/logs?pageNo=1&pageSize=20&keyword=/api/tickets"),
+                HttpMethod.GET,
+                new HttpEntity<>(authHeaders()),
+                Map.class
+        );
+        Map<String, Object> page = data(logResponse);
+        List<Map<String, Object>> records = (List<Map<String, Object>>) page.get("records");
+        assertThat(records).anySatisfy(record -> {
+            assertThat(record.get("requestMethod")).isEqualTo("POST");
+            assertThat(record.get("requestUri").toString()).contains("/api/tickets");
+            assertThat(record.get("operatorId")).isEqualTo(1);
+        });
+        assertThat(ticketId).isPositive();
+    }
+
     @SuppressWarnings("unchecked")
     private String loginAndToken() {
         return loginAndToken("admin", "123456");
@@ -554,8 +664,13 @@ class AuthIntegrationTest {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> waitForMessage(String businessType, Long businessId) throws Exception {
+        return waitForMessage(businessType, businessId, token);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> waitForMessage(String businessType, Long businessId, String bearerToken) throws Exception {
         for (int i = 0; i < 20; i++) {
-            List<Map<String, Object>> records = messageRecords();
+            List<Map<String, Object>> records = messageRecords(bearerToken);
             Map<String, Object> message = records.stream()
                     .filter(record -> businessType.equals(record.get("businessType"))
                             && businessId.equals(numberValue(record.get("businessId")).longValue()))
@@ -571,10 +686,15 @@ class AuthIntegrationTest {
 
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> messageRecords() {
+        return messageRecords(token);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> messageRecords(String bearerToken) {
         ResponseEntity<Map> response = restTemplate.exchange(
                 url("/api/messages?pageNo=1&pageSize=20"),
                 HttpMethod.GET,
-                new HttpEntity<>(authHeaders()),
+                new HttpEntity<>(authHeaders(bearerToken)),
                 Map.class
         );
         Map<String, Object> page = data(response);

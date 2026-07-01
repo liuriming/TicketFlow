@@ -11,7 +11,10 @@ import java.time.LocalDateTime;
  * @param content 消息内容。
  * @param businessType 业务类型。
  * @param businessId 业务 ID。
+ * @param level 消息级别，例如 INFO、WARNING、ERROR。
+ * @param dedupeKey 幂等键，用于排查重复消息来源。
  * @param readFlag 是否已读：1 已读，0 未读。
+ * @param readAt 已读时间，未读时为空。
  * @param createdAt 创建时间。
  */
 public record NotificationMessageResponse(
@@ -21,7 +24,10 @@ public record NotificationMessageResponse(
         String content,
         String businessType,
         Long businessId,
+        String level,
+        String dedupeKey,
         Integer readFlag,
+        LocalDateTime readAt,
         LocalDateTime createdAt
 ) {
 }

@@ -12,6 +12,8 @@ import com.ticketflow.common.context.LoginUser;
 import com.ticketflow.common.exception.BusinessException;
 import com.ticketflow.common.exception.ErrorCode;
 import com.ticketflow.common.web.PageResult;
+import com.ticketflow.notification.dto.NotificationEvent;
+import com.ticketflow.notification.service.NotificationPublisher;
 import com.ticketflow.rule.domain.AutoDispatchResult;
 import com.ticketflow.rule.service.AutoDispatchService;
 import com.ticketflow.sla.domain.SlaCalculator;
@@ -24,6 +26,7 @@ import com.ticketflow.system.entity.SysUser;
 import com.ticketflow.system.mapper.SysDeptMapper;
 import com.ticketflow.system.mapper.SysUserMapper;
 import com.ticketflow.ticket.domain.TicketDataScopeSupport;
+import com.ticketflow.ticket.domain.TicketNotificationFactory;
 import com.ticketflow.ticket.domain.TicketWorkflowEngine;
 import com.ticketflow.ticket.dto.TicketActionRequest;
 import com.ticketflow.ticket.dto.TicketCommentRequest;
@@ -84,6 +87,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
     private final TicketCategoryMapper categoryMapper;
     private final SysUserMapper userMapper;
     private final SysDeptMapper deptMapper;
+    private final NotificationPublisher notificationPublisher;
 
     @Override
     public PageResult<TicketListItemResponse> pageTickets(long pageNo, long pageSize, TicketStatus status, String keyword) {
@@ -164,6 +168,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
         TicketFlowRecord record = TicketWorkflowEngine.accept(ticket, loginUser.userId(), LocalDateTime.now());
         updateById(ticket);
         flowRecordMapper.insert(record);
+        publishNotification(TicketNotificationFactory.accepted(ticket));
         evictHotStats();
         return detail(id);
     }
@@ -176,6 +181,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
         TicketFlowRecord record = TicketWorkflowEngine.submitResult(ticket, loginUser.userId(), request.result());
         updateById(ticket);
         flowRecordMapper.insert(record);
+        publishNotification(TicketNotificationFactory.pendingConfirm(ticket));
         evictHotStats();
         return detail(id);
     }
@@ -189,6 +195,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
         TicketFlowRecord record = TicketWorkflowEngine.transfer(ticket, request.assigneeId(), loginUser.userId(), reason);
         updateById(ticket);
         flowRecordMapper.insert(record);
+        publishNotification(TicketNotificationFactory.transferred(ticket));
         evictHotStats();
         return detail(id);
     }
@@ -204,6 +211,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
         }
         updateById(ticket);
         flowRecordMapper.insert(record);
+        publishNotification(TicketNotificationFactory.closed(ticket));
         evictHotStats();
         return detail(id);
     }
@@ -217,6 +225,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
         TicketFlowRecord record = TicketWorkflowEngine.reject(ticket, loginUser.userId(), reason);
         updateById(ticket);
         flowRecordMapper.insert(record);
+        publishNotification(TicketNotificationFactory.rejected(ticket));
         evictHotStats();
         return detail(id);
     }
@@ -230,6 +239,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
         TicketFlowRecord record = TicketWorkflowEngine.cancel(ticket, loginUser.userId(), reason);
         updateById(ticket);
         flowRecordMapper.insert(record);
+        publishTicketParticipantNotification(ticket, loginUser.userId(), TicketNotificationFactory::canceled);
         evictHotStats();
         return detail(id);
     }
@@ -238,13 +248,14 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
     @Transactional(rollbackFor = Exception.class)
     public TicketDetailResponse addComment(Long id, TicketCommentRequest request) {
         LoginUser loginUser = CurrentUserContext.getRequired();
-        getTicketRequired(id);
+        Ticket ticket = getTicketRequired(id);
         TicketComment comment = new TicketComment();
         comment.setTicketId(id);
         comment.setUserId(loginUser.userId());
         comment.setContent(request.content());
         comment.setInternalOnly(Boolean.TRUE.equals(request.internalOnly()) ? 1 : 0);
         commentMapper.insert(comment);
+        publishCommentNotifications(ticket, loginUser.userId(), comment.getId());
         return detail(id);
     }
 
@@ -303,10 +314,50 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, Ticket> impleme
         dispatchRecord.setOperatorId(operatorId);
         dispatchRecord.setRemark(result.reason());
         flowRecordMapper.insert(dispatchRecord);
+        publishNotification(TicketNotificationFactory.assigned(ticket));
     }
 
     private void evictHotStats() {
         cacheService.deleteByPattern(TicketFlowCacheKeys.hotStatsPattern());
+    }
+
+    private void publishNotification(NotificationEvent event) {
+        if (event == null || event.receiverId() == null) {
+            return;
+        }
+        notificationPublisher.publish(event);
+    }
+
+    private void publishCommentNotifications(Ticket ticket, Long operatorId, Long commentId) {
+        Set<Long> receiverIds = new HashSet<>();
+        if (ticket.getCreatorId() != null && !ticket.getCreatorId().equals(operatorId)) {
+            receiverIds.add(ticket.getCreatorId());
+        }
+        if (ticket.getAssigneeId() != null && !ticket.getAssigneeId().equals(operatorId)) {
+            receiverIds.add(ticket.getAssigneeId());
+        }
+        receiverIds.forEach(receiverId -> publishNotification(TicketNotificationFactory.commented(ticket, receiverId, commentId)));
+    }
+
+    private void publishTicketParticipantNotification(
+            Ticket ticket,
+            Long operatorId,
+            TicketParticipantNotificationBuilder builder
+    ) {
+        Set<Long> receiverIds = new HashSet<>();
+        if (ticket.getCreatorId() != null && !ticket.getCreatorId().equals(operatorId)) {
+            receiverIds.add(ticket.getCreatorId());
+        }
+        if (ticket.getAssigneeId() != null && !ticket.getAssigneeId().equals(operatorId)) {
+            receiverIds.add(ticket.getAssigneeId());
+        }
+        receiverIds.forEach(receiverId -> publishNotification(builder.build(ticket, receiverId)));
+    }
+
+    @FunctionalInterface
+    private interface TicketParticipantNotificationBuilder {
+
+        NotificationEvent build(Ticket ticket, Long receiverId);
     }
 
     private TicketDetailResponse toDetailResponse(

@@ -41,7 +41,9 @@ VALUES
     (26, 12, '维护部门', 'BUTTON', NULL, NULL, NULL, 'system:dept:write', 10, 1),
     (27, 4, '维护工单分类', 'BUTTON', NULL, NULL, NULL, 'ticket:category:write', 10, 1),
     (28, 6, '维护派单规则', 'BUTTON', NULL, NULL, NULL, 'rule:dispatch:write', 10, 1),
-    (29, 7, '维护 SLA 规则', 'BUTTON', NULL, NULL, NULL, 'rule:sla:write', 10, 1);
+    (29, 7, '维护 SLA 规则', 'BUTTON', NULL, NULL, NULL, 'rule:sla:write', 10, 1),
+    (30, 0, '消息中心', 'MENU', '/messages', 'message/index', 'Bell', 'message:view', 6, 1),
+    (31, 8, '审计日志', 'MENU', '/system/audit-logs', 'system/audit-log', 'DocumentChecked', 'audit:log:list', 5, 1);
 
 UPDATE sys_menu SET visible = 1 WHERE type = 'BUTTON' AND id BETWEEN 14 AND 29;
 
@@ -51,7 +53,8 @@ SELECT menu_id, 1, menu_id FROM (
     SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL
     SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL
     SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL
-    SELECT 24 UNION ALL SELECT 25 UNION ALL SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29
+    SELECT 24 UNION ALL SELECT 25 UNION ALL SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29 UNION ALL
+    SELECT 30 UNION ALL SELECT 31
 ) t;
 
 INSERT IGNORE INTO sys_role_menu (id, role_id, menu_id)
@@ -65,6 +68,7 @@ VALUES
     (107, 4, 20),
     (108, 4, 21),
     (109, 4, 22),
+    (110, 4, 30),
     (201, 3, 1),
     (202, 3, 2),
     (203, 3, 3),
@@ -73,6 +77,7 @@ VALUES
     (206, 3, 17),
     (207, 3, 21),
     (208, 3, 22),
+    (209, 3, 30),
     (301, 2, 1),
     (302, 2, 2),
     (303, 2, 3),
@@ -88,7 +93,8 @@ VALUES
     (313, 2, 19),
     (314, 2, 20),
     (315, 2, 21),
-    (316, 2, 22);
+    (316, 2, 22),
+    (317, 2, 30);
 
 INSERT IGNORE INTO sys_user (id, username, password_hash, password_salt, real_name, phone, email, dept_id, status)
 VALUES

@@ -161,6 +161,18 @@ CREATE TABLE IF NOT EXISTS sla_rule (
     UNIQUE KEY uk_sla_priority (priority)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS sla_alert_record (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ticket_id BIGINT NOT NULL,
+    alert_type VARCHAR(64) NOT NULL,
+    published_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    UNIQUE KEY uk_sla_alert_ticket_type (ticket_id, alert_type),
+    KEY idx_sla_alert_ticket (ticket_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS attachment (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     business_type VARCHAR(64) NOT NULL,
@@ -184,9 +196,32 @@ CREATE TABLE IF NOT EXISTS notification_message (
     content TEXT NOT NULL,
     business_type VARCHAR(64),
     business_id BIGINT,
+    level VARCHAR(32) NOT NULL DEFAULT 'INFO',
+    dedupe_key VARCHAR(200) NOT NULL,
     read_flag TINYINT NOT NULL DEFAULT 0,
+    read_at DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted TINYINT NOT NULL DEFAULT 0,
-    KEY idx_notification_receiver (receiver_id, read_flag)
+    KEY idx_notification_receiver (receiver_id, read_flag),
+    KEY idx_notification_business (business_type, business_id),
+    UNIQUE KEY uk_notification_dedupe (receiver_id, dedupe_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS operation_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_id BIGINT,
+    operator_name VARCHAR(64),
+    request_method VARCHAR(16) NOT NULL,
+    request_uri VARCHAR(500) NOT NULL,
+    query_string VARCHAR(1000),
+    client_ip VARCHAR(64),
+    success TINYINT NOT NULL DEFAULT 1,
+    error_message VARCHAR(1000),
+    duration_ms BIGINT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    KEY idx_operation_log_operator (operator_id),
+    KEY idx_operation_log_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

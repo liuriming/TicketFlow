@@ -17,6 +17,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     private final TokenAuthInterceptor tokenAuthInterceptor;
     private final PermissionAuthInterceptor permissionAuthInterceptor;
+    private final OperationLogInterceptor operationLogInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -30,6 +31,15 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/swagger-ui.html"
                 );
         registry.addInterceptor(permissionAuthInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns(
+                        "/api/auth/login",
+                        "/api/health",
+                        "/v3/api-docs/**",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html"
+                );
+        registry.addInterceptor(operationLogInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
                         "/api/auth/login",

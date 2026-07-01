@@ -11,3 +11,7 @@ export function fetchUnreadCount() {
 export function markMessageRead(id) {
   return http.post(`/messages/${id}/read`)
 }
+
+export function markAllMessagesRead(data = {}) {
+  return http.post('/messages/read-all', data)
+}

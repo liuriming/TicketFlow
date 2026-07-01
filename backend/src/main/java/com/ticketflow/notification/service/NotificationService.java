@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.ticketflow.common.web.PageResult;
 import com.ticketflow.notification.dto.NotificationEvent;
 import com.ticketflow.notification.dto.NotificationMessageResponse;
+import com.ticketflow.notification.dto.NotificationQueryRequest;
 import com.ticketflow.notification.entity.NotificationMessage;
 
 /**
@@ -30,11 +31,32 @@ public interface NotificationService extends IService<NotificationMessage> {
     PageResult<NotificationMessageResponse> pageCurrentUserMessages(long pageNo, long pageSize);
 
     /**
+     * 按条件查询当前用户站内信。
+     *
+     * @param pageNo 当前页码。
+     * @param pageSize 每页数量。
+     * @param request 查询条件。
+     * @return 站内信分页列表。
+     */
+    PageResult<NotificationMessageResponse> pageCurrentUserMessages(
+            long pageNo,
+            long pageSize,
+            NotificationQueryRequest request
+    );
+
+    /**
      * 标记消息为已读。
      *
      * @param id 消息 ID。
      */
     void markRead(Long id);
+
+    /**
+     * 按条件批量标记当前用户消息为已读。
+     *
+     * @param request 查询条件，空条件表示标记当前用户所有未读消息。
+     */
+    void markAllRead(NotificationQueryRequest request);
 
     /**
      * 查询当前用户未读数量。

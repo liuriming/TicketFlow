@@ -67,10 +67,22 @@ const routes = [
         component: () => import('../views/SystemView.vue')
       },
       {
+        path: 'system/audit-logs',
+        name: 'audit-logs',
+        meta: { title: '审计日志', icon: 'DocumentChecked' },
+        component: () => import('../views/AuditLogView.vue')
+      },
+      {
         path: 'reports',
         name: 'reports',
         meta: { title: '统计看板', icon: 'TrendCharts' },
         component: () => import('../views/ReportView.vue')
+      },
+      {
+        path: 'messages',
+        name: 'messages',
+        meta: { title: '消息中心', icon: 'Bell' },
+        component: () => import('../views/MessageCenterView.vue')
       }
     ]
   }

@@ -43,7 +43,10 @@
             <div class="message-popover">
               <div class="message-head">
                 <strong>站内信</strong>
-                <el-button link type="primary" @click="loadMessages">刷新</el-button>
+                <span>
+                  <el-button link type="primary" @click="goMessageCenter">消息中心</el-button>
+                  <el-button link type="primary" @click="loadMessages">刷新</el-button>
+                </span>
               </div>
               <el-scrollbar height="320px">
                 <button
@@ -89,6 +92,7 @@ import {
   Bell,
   Connection,
   Document,
+  DocumentChecked,
   Folder,
   Menu as MenuIcon,
   Monitor,
@@ -143,16 +147,20 @@ const fallbackMenus = [
       { id: 'system-users', name: '用户管理', path: '/system/users', icon: 'User' },
       { id: 'system-roles', name: '角色管理', path: '/system/roles', icon: 'Avatar' },
       { id: 'system-menus', name: '菜单管理', path: '/system/menus', icon: 'Menu' },
-      { id: 'system-depts', name: '部门管理', path: '/system/depts', icon: 'OfficeBuilding' }
+      { id: 'system-depts', name: '部门管理', path: '/system/depts', icon: 'OfficeBuilding' },
+      { id: 'audit-logs', name: '审计日志', path: '/system/audit-logs', icon: 'DocumentChecked' }
     ]
   },
-  { id: 'reports', name: '统计看板', path: '/reports', icon: 'TrendCharts', children: [] }
+  { id: 'reports', name: '统计看板', path: '/reports', icon: 'TrendCharts', children: [] },
+  { id: 'messages', name: '消息中心', path: '/messages', icon: 'Bell', children: [] }
 ]
 
 const iconMap = {
   Avatar,
+  Bell,
   Connection,
   Document,
+  DocumentChecked,
   Folder,
   Menu: MenuIcon,
   Monitor,
@@ -200,8 +208,12 @@ async function handleMessageClick(message) {
     message.readFlag = 1
     await loadUnreadCount()
   }
-  if (message.businessType === 'TICKET' && message.businessId) {
+  if (message.businessId && (message.businessType?.startsWith('TICKET') || message.businessType?.startsWith('SLA'))) {
     router.push({ path: '/tickets/list', query: { ticketId: message.businessId } })
   }
+}
+
+function goMessageCenter() {
+  router.push('/messages')
 }
 </script>

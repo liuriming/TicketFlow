@@ -1,5 +1,7 @@
 package com.ticketflow.notification.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -11,12 +13,15 @@ import com.ticketflow.common.exception.ErrorCode;
 import com.ticketflow.common.web.PageResult;
 import com.ticketflow.notification.dto.NotificationEvent;
 import com.ticketflow.notification.dto.NotificationMessageResponse;
+import com.ticketflow.notification.dto.NotificationQueryRequest;
 import com.ticketflow.notification.entity.NotificationMessage;
 import com.ticketflow.notification.mapper.NotificationMessageMapper;
 import com.ticketflow.notification.service.NotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -32,8 +37,7 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
     public void saveIfAbsent(NotificationEvent event) {
         Long count = count(Wrappers.<NotificationMessage>lambdaQuery()
                 .eq(NotificationMessage::getReceiverId, event.receiverId())
-                .eq(NotificationMessage::getBusinessType, event.businessType())
-                .eq(NotificationMessage::getBusinessId, event.businessId()));
+                .eq(NotificationMessage::getDedupeKey, event.dedupeKey()));
         if (count > 0) {
             return;
         }
@@ -43,15 +47,25 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
         message.setContent(event.content());
         message.setBusinessType(event.businessType());
         message.setBusinessId(event.businessId());
+        message.setLevel(event.level());
+        message.setDedupeKey(event.dedupeKey());
         message.setReadFlag(0);
         save(message);
     }
 
     @Override
     public PageResult<NotificationMessageResponse> pageCurrentUserMessages(long pageNo, long pageSize) {
+        return pageCurrentUserMessages(pageNo, pageSize, new NotificationQueryRequest(null, null, null));
+    }
+
+    @Override
+    public PageResult<NotificationMessageResponse> pageCurrentUserMessages(
+            long pageNo,
+            long pageSize,
+            NotificationQueryRequest request
+    ) {
         LoginUser loginUser = CurrentUserContext.getRequired();
-        IPage<NotificationMessage> page = page(Page.of(pageNo, pageSize), Wrappers.<NotificationMessage>lambdaQuery()
-                .eq(NotificationMessage::getReceiverId, loginUser.userId())
+        IPage<NotificationMessage> page = page(Page.of(pageNo, pageSize), buildCurrentUserQuery(loginUser, request)
                 .orderByAsc(NotificationMessage::getReadFlag)
                 .orderByDesc(NotificationMessage::getCreatedAt));
         List<NotificationMessageResponse> records = page.getRecords().stream()
@@ -72,7 +86,29 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
             throw new BusinessException(ErrorCode.FORBIDDEN, "不能操作他人的消息");
         }
         message.setReadFlag(1);
+        message.setReadAt(LocalDateTime.now());
         updateById(message);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void markAllRead(NotificationQueryRequest request) {
+        LoginUser loginUser = CurrentUserContext.getRequired();
+        LambdaUpdateWrapper<NotificationMessage> updateWrapper = Wrappers.<NotificationMessage>lambdaUpdate()
+                .eq(NotificationMessage::getReceiverId, loginUser.userId())
+                .eq(NotificationMessage::getReadFlag, 0)
+                .set(NotificationMessage::getReadFlag, 1)
+                .set(NotificationMessage::getReadAt, LocalDateTime.now());
+        if (request != null && StringUtils.hasText(request.businessType())) {
+            applyBusinessType(updateWrapper, request.businessType());
+        }
+        if (request != null && StringUtils.hasText(request.keyword())) {
+            updateWrapper.and(wrapper -> wrapper
+                    .like(NotificationMessage::getTitle, request.keyword())
+                    .or()
+                    .like(NotificationMessage::getContent, request.keyword()));
+        }
+        update(updateWrapper);
     }
 
     @Override
@@ -91,8 +127,57 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMessageMapp
                 message.getContent(),
                 message.getBusinessType(),
                 message.getBusinessId(),
+                message.getLevel(),
+                message.getDedupeKey(),
                 message.getReadFlag(),
+                message.getReadAt(),
                 message.getCreatedAt()
         );
+    }
+
+    private LambdaQueryWrapper<NotificationMessage> buildCurrentUserQuery(
+            LoginUser loginUser,
+            NotificationQueryRequest request
+    ) {
+        LambdaQueryWrapper<NotificationMessage> query = Wrappers.<NotificationMessage>lambdaQuery()
+                .eq(NotificationMessage::getReceiverId, loginUser.userId());
+        if (request == null) {
+            return query;
+        }
+        if (request.readFlag() != null) {
+            query.eq(NotificationMessage::getReadFlag, request.readFlag());
+        }
+        if (StringUtils.hasText(request.businessType())) {
+            applyBusinessType(query, request.businessType());
+        }
+        if (StringUtils.hasText(request.keyword())) {
+            query.and(wrapper -> wrapper
+                    .like(NotificationMessage::getTitle, request.keyword())
+                    .or()
+                    .like(NotificationMessage::getContent, request.keyword()));
+        }
+        return query;
+    }
+
+    private void applyBusinessType(
+            LambdaQueryWrapper<NotificationMessage> query,
+            String businessType
+    ) {
+        if ("TICKET".equals(businessType) || "SLA".equals(businessType)) {
+            query.likeRight(NotificationMessage::getBusinessType, businessType);
+            return;
+        }
+        query.eq(NotificationMessage::getBusinessType, businessType);
+    }
+
+    private void applyBusinessType(
+            LambdaUpdateWrapper<NotificationMessage> updateWrapper,
+            String businessType
+    ) {
+        if ("TICKET".equals(businessType) || "SLA".equals(businessType)) {
+            updateWrapper.likeRight(NotificationMessage::getBusinessType, businessType);
+            return;
+        }
+        updateWrapper.eq(NotificationMessage::getBusinessType, businessType);
     }
 }
